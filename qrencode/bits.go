@@ -74,7 +74,7 @@ func (v *BitVector) String() string {
 func (g *BitGrid) String() string {
 	b := bytes.Buffer{}
 	for y, w, h := 0, g.Width(), g.Height(); y < h; y++ {
-		for x := 0; x < w; x++ {
+		for x := range w {
 			if g.Empty(x, y) {
 				b.WriteString(" ")
 			} else if g.Get(x, y) {
@@ -93,20 +93,18 @@ func (g *BitGrid) String() string {
 // The actual size may be smaller than specified to maintain square pixels.
 func (g *BitGrid) ToRGB565WithSize(maxWidth, maxHeight int) []uint16 {
 	margin := 4
-	// Calculate the maximum block size that fits within the given dimensions
+
 	gridWithMargin := g.Width() + 2*margin
+
 	blockSizeWidth := maxWidth / gridWithMargin
+
 	blockSizeHeight := maxHeight / gridWithMargin
 
 	blockSize := blockSizeWidth
-	if blockSizeHeight < blockSize {
-		blockSize = blockSizeHeight
-	}
 
-	// Ensure at least 1 pixel per block
-	if blockSize < 1 {
-		blockSize = 1
-	}
+	blockSize = min(blockSizeWidth, blockSizeHeight)
+
+	blockSize = max(blockSize, 1)
 
 	return g.ToRGB565WithMargin(blockSize, margin)
 }

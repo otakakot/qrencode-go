@@ -35,10 +35,10 @@ func interleaveWithECBytes(bits *BitVector, version versionNumber, ecLevel ECLev
 
 	blocks := make([]blockPair, numRSBlocks)
 
-	for i := 0; i < numRSBlocks; i++ {
+	for i := range blocks {
 		numDataBytes, numEcBytes := getBlockSizes(numTotalBytes, numDataBytes, numRSBlocks, i)
 		blocks[i] = blockPair{make([]int, numDataBytes), make([]int, numEcBytes)}
-		for j := 0; j < numDataBytes; j++ {
+		for j := range numDataBytes {
 			blocks[i].dataBytes[j] = 0
 			if bits.Get(8 * (dataBytesOffset + j)) {
 				blocks[i].dataBytes[j] |= 128
@@ -135,7 +135,7 @@ func generateECBytes(block *blockPair) {
 	info = info.MultiplyByMonomial(len(block.ecBytes), 1)
 	_, remainder := info.Divide(generator)
 	numZeroCoefficients := len(block.ecBytes) - len(remainder.coefficients)
-	for i := 0; i < numZeroCoefficients; i++ {
+	for i := range numZeroCoefficients {
 		block.ecBytes[i] = 0
 	}
 	copy(block.ecBytes[numZeroCoefficients:], remainder.coefficients)
