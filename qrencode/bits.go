@@ -2,9 +2,6 @@ package qrencode
 
 import (
 	"bytes"
-	"image"
-	"image/color"
-	"io"
 )
 
 // The test benchmark shows that encoding with boolBitVector/boolBitGrid is
@@ -91,77 +88,80 @@ func (g *BitGrid) String() string {
 	return b.String()
 }
 
-// Encode the Grid in ANSI escape sequences and set the background according
-// to the values in the BitGrid surrounded by a white frame
-func (g *BitGrid) TerminalOutput(w io.Writer) {
-	white := "\033[47m  \033[0m"
-	black := "\033[40m  \033[0m"
-	newline := "\n"
+// ToRGB565WithSize returns RGB565 pixel data that fits within the specified width and height.
+// It automatically calculates the appropriate block size to fit the QR code.
+// The actual size may be smaller than specified to maintain square pixels.
+func (g *BitGrid) ToRGB565WithSize(maxWidth, maxHeight int) []uint16 {
+	margin := 4
+	// Calculate the maximum block size that fits within the given dimensions
+	gridWithMargin := g.Width() + 2*margin
+	blockSizeWidth := maxWidth / gridWithMargin
+	blockSizeHeight := maxHeight / gridWithMargin
 
-	w.Write([]byte(white))
-	for i := 0; i <= g.Width(); i++ {
-		w.Write([]byte(white))
+	blockSize := blockSizeWidth
+	if blockSizeHeight < blockSize {
+		blockSize = blockSizeHeight
 	}
-	w.Write([]byte(newline))
 
-	for i := 0; i < g.Height(); i++ {
-		w.Write([]byte(white))
-		for j := 0; j < g.Width(); j++ {
-			if g.Get(j, i) {
-				w.Write([]byte(black))
-			} else {
-				w.Write([]byte(white))
-			}
-		}
-		w.Write([]byte(white))
-		w.Write([]byte(newline))
+	// Ensure at least 1 pixel per block
+	if blockSize < 1 {
+		blockSize = 1
 	}
-	w.Write([]byte(white))
-	for i := 0; i <= g.Width(); i++ {
-		w.Write([]byte(white))
-	}
-	w.Write([]byte(newline))
+
+	return g.ToRGB565WithMargin(blockSize, margin)
 }
 
 // Return an image of the grid, with black blocks for true items and
 // white blocks for false items, with the given block size and a
 // default margin.
-func (g *BitGrid) Image(blockSize int) image.Image {
-	return g.ImageWithMargin(blockSize, 4)
+func (g *BitGrid) ToRGB565(blockSize int) []uint16 {
+	return g.ToRGB565WithMargin(blockSize, 4)
+}
+
+// GetRGB565Size returns the actual width and height of the RGB565 image
+// that will be generated with the given block size and margin.
+func (g *BitGrid) GetRGB565Size(blockSize, margin int) (width, height int) {
+	width = blockSize * (2*margin + g.Width())
+	height = blockSize * (2*margin + g.Height())
+	return
 }
 
 // Return an image of the grid, with black blocks for true items and
 // white blocks for false items, with the given block size and margin.
-func (g *BitGrid) ImageWithMargin(blockSize, margin int) image.Image {
-	width := blockSize * (2*margin + g.Width())
-	height := blockSize * (2*margin + g.Height())
-	i := image.NewGray16(image.Rect(0, 0, width, height))
-	for y := 0; y < blockSize*margin; y++ {
-		for x := 0; x < width; x++ {
-			i.Set(x, y, color.White)
-			i.Set(x, height-1-y, color.White)
-		}
+func (g *BitGrid) ToRGB565WithMargin(blockSize, margin int) []uint16 {
+	width := uint16(blockSize * (2*margin + g.Width()))
+	height := uint16(blockSize * (2*margin + g.Height()))
+	size := int(width * height)
+
+	if size <= 0 || size > 1024*1024 {
+		return nil
 	}
-	for y := blockSize * margin; y < height-blockSize*margin; y++ {
-		for x := 0; x < blockSize*margin; x++ {
-			i.Set(x, y, color.White)
-			i.Set(width-1-x, y, color.White)
-		}
+
+	pixels := make([]uint16, size)
+
+	white := uint16(0xFFFF) // RGB565: 11111 111111 11111
+	black := uint16(0x0000) // RGB565: 00000 000000 00000
+
+	for i := range pixels {
+		pixels[i] = white
 	}
-	for y, w, h := 0, g.Width(), g.Height(); y < h; y++ {
-		for x := 0; x < w; x++ {
-			x0 := blockSize * (x + margin)
-			y0 := blockSize * (y + margin)
-			c := color.White
-			if g.Get(x, y) {
-				c = color.Black
-			}
-			for dy := 0; dy < blockSize; dy++ {
-				for dx := 0; dx < blockSize; dx++ {
-					i.Set(x0+dx, y0+dy, c)
+
+	for y := range uint16(g.Height()) {
+		for x := range uint16(g.Width()) {
+			if g.Get(int(x), int(y)) {
+				x0 := uint16(blockSize) * (x + uint16(margin))
+				y0 := uint16(blockSize) * (y + uint16(margin))
+				for dy := uint16(0); dy < uint16(blockSize); dy++ {
+					for dx := uint16(0); dx < uint16(blockSize); dx++ {
+						idx := (y0+dy)*width + (x0 + dx)
+						if idx >= 0 && idx < uint16(size) {
+							pixels[idx] = black
+						}
+					}
 				}
 			}
 		}
 	}
-	return i
+
+	return pixels
 }

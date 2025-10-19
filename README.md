@@ -1,12 +1,6 @@
-QR encoder in Go based on the ZXing encoder (http://code.google.com/p/zxing/).
+# qrencode-go
 
-[![GoDoc](https://godoc.org/github.com/qpliu/qrencode-go/qrencode?status.svg)](https://godoc.org/github.com/qpliu/qrencode-go/qrencode)
-[![Build Status](https://travis-ci.org/qpliu/qrencode-go.svg?branch=master)](https://travis-ci.org/qpliu/qrencode-go)
-
-I was surprised that I couldn't find a QR encoder in Go, especially
-since the example at http://golang.org/doc/effective_go.html#web_server
-is a QR code generator, though the QR encoding is done by an external
-Google service in the example.
+This repository is a fork of [qpliu/qrencode-go](https://github.com/qpliu/qrencode-go) to make it work with TinyGo.
 
 # Example
 
@@ -14,31 +8,40 @@ Google service in the example.
 package main
 
 import (
-	"bytes"
-	"image/png"
-	"os"
+	"tinygo.org/x/drivers/examples/ili9341/initdisplay"
+	"tinygo.org/x/drivers/ili9341"
 
-	"github.com/qpliu/qrencode-go/qrencode"
+	"github.com/otakakot/qrencode-go/qrencode"
 )
 
 func main() {
-	var buf bytes.Buffer
-	for i, arg := range os.Args {
-		if i > 1 {
-			if err := buf.WriteByte(' '); err != nil {
-				panic(err)
-			}
-		}
-		if i > 0 {
-			if _, err := buf.WriteString(arg); err != nil {
-				panic(err)
-			}
-		}
+	display := initdisplay.InitDisplay()
+
+	width, height := display.Size()
+	if width < 320 || height < 240 {
+		display.SetRotation(ili9341.Rotation270)
 	}
-	grid, err := qrencode.Encode(buf.String(), qrencode.ECLevelQ)
+
+	grid, err := qrencode.Encode("https://github.com/otakakot", qrencode.ECLevelL)
 	if err != nil {
 		panic(err)
 	}
-	png.Encode(os.Stdout, grid.Image(8))
+
+	qrSize := 240
+	pixels := grid.ToRGB565WithSize(qrSize, qrSize)
+
+	blockSize := qrSize / (grid.Width() + 8)
+	if blockSize < 1 {
+		blockSize = 1
+	}
+	actualWidth, actualHeight := grid.GetRGB565Size(blockSize, 4)
+
+	x := (320 - actualWidth) / 2
+	y := (240 - actualHeight) / 2
+
+	err = display.DrawRGBBitmap(int16(x), int16(y), pixels, int16(actualWidth), int16(actualHeight))
+	if err != nil {
+		panic(err)
+	}
 }
 ```
