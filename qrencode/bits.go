@@ -1,11 +1,8 @@
 package qrencode
 
 import (
-	"bytes"
+	"strings"
 )
-
-// The test benchmark shows that encoding with boolBitVector/boolBitGrid is
-// twice as fast as byteBitVector/byteBitGrid and uin32BitVector/uint32BitGrid.
 
 type BitVector struct {
 	boolBitVector
@@ -23,44 +20,9 @@ func NewBitGrid(width, height int) *BitGrid {
 	return &BitGrid{newBoolBitGrid(width, height)}
 }
 
-/*
-type BitVector struct {
-	byteBitVector
-}
-
-type BitGrid struct {
-	byteBitGrid
-}
-
-func (v *BitVector) AppendBits(b BitVector) {
-	v.byteBitVector.AppendBits(b.byteBitVector)
-}
-
-func NewBitGrid(width, height int) *BitGrid {
-	return &BitGrid{newByteBitGrid(width, height)}
-}
-*/
-
-/*
-type BitVector struct {
-	uint32BitVector
-}
-
-type BitGrid struct {
-	uint32BitGrid
-}
-
-func (v *BitVector) AppendBits(b BitVector) {
-	v.uint32BitVector.AppendBits(b.uint32BitVector)
-}
-
-func NewBitGrid(width, height int) *BitGrid {
-	return &BitGrid{newUint32BitGrid(width, height)}
-}
-*/
-
 func (v *BitVector) String() string {
-	b := bytes.Buffer{}
+	var b strings.Builder
+	b.Grow(v.Length())
 	for i, l := 0, v.Length(); i < l; i++ {
 		if v.Get(i) {
 			b.WriteString("1")
@@ -72,8 +34,10 @@ func (v *BitVector) String() string {
 }
 
 func (g *BitGrid) String() string {
-	b := bytes.Buffer{}
-	for y, w, h := 0, g.Width(), g.Height(); y < h; y++ {
+	w, h := g.Width(), g.Height()
+	var b strings.Builder
+	b.Grow((w + 1) * h)
+	for y := range h {
 		for x := range w {
 			if g.Empty(x, y) {
 				b.WriteString(" ")
@@ -118,7 +82,7 @@ func (g *BitGrid) ToRGB565(blockSize int) []uint16 {
 
 // GetRGB565Size returns the actual width and height of the RGB565 image
 // that will be generated with the given block size and margin.
-func (g *BitGrid) GetRGB565Size(blockSize, margin int) (width, height int) {
+func (g *BitGrid) GetRGB565Size(blockSize int, margin int) (width, height int) {
 	width = blockSize * (2*margin + g.Width())
 	height = blockSize * (2*margin + g.Height())
 	return
@@ -126,9 +90,11 @@ func (g *BitGrid) GetRGB565Size(blockSize, margin int) (width, height int) {
 
 // Return an image of the grid, with black blocks for true items and
 // white blocks for false items, with the given block size and margin.
-func (g *BitGrid) ToRGB565WithMargin(blockSize, margin int) []uint16 {
-	width := uint16(blockSize * (2*margin + g.Width()))
-	height := uint16(blockSize * (2*margin + g.Height()))
+func (g *BitGrid) ToRGB565WithMargin(blockSize int, margin int) []uint16 {
+	gridWidth := g.Width()
+	gridHeight := g.Height()
+	width := uint16(blockSize * (2*margin + gridWidth))
+	height := uint16(blockSize * (2*margin + gridHeight))
 	size := int(width * height)
 
 	if size <= 0 || size > 1024*1024 {
@@ -144,17 +110,18 @@ func (g *BitGrid) ToRGB565WithMargin(blockSize, margin int) []uint16 {
 		pixels[i] = white
 	}
 
-	for y := range uint16(g.Height()) {
-		for x := range uint16(g.Width()) {
-			if g.Get(int(x), int(y)) {
-				x0 := uint16(blockSize) * (x + uint16(margin))
-				y0 := uint16(blockSize) * (y + uint16(margin))
-				for dy := uint16(0); dy < uint16(blockSize); dy++ {
-					for dx := uint16(0); dx < uint16(blockSize); dx++ {
-						idx := (y0+dy)*width + (x0 + dx)
-						if idx >= 0 && idx < uint16(size) {
-							pixels[idx] = black
-						}
+	blockSizeU16 := uint16(blockSize)
+	marginU16 := uint16(margin)
+
+	for y := range gridHeight {
+		y0 := blockSizeU16 * (uint16(y) + marginU16)
+		for x := range gridWidth {
+			if g.Get(x, y) {
+				x0 := blockSizeU16 * (uint16(x) + marginU16)
+				for dy := uint16(0); dy < blockSizeU16; dy++ {
+					rowStart := (y0 + dy) * width
+					for dx := uint16(0); dx < blockSizeU16; dx++ {
+						pixels[rowStart+x0+dx] = black
 					}
 				}
 			}

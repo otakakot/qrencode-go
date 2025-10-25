@@ -39,8 +39,7 @@ func main() {
 	x := (320 - actualWidth) / 2
 	y := (240 - actualHeight) / 2
 
-	err = display.DrawRGBBitmap(int16(x), int16(y), pixels, int16(actualWidth), int16(actualHeight))
-	if err != nil {
+	if err = display.DrawRGBBitmap(int16(x), int16(y), pixels, int16(actualWidth), int16(actualHeight)); err != nil {
 		panic(err)
 	}
 }
