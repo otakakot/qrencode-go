@@ -48,102 +48,32 @@ func contentBits(content []byte, ecLevel ECLevel, mode modeIndicator, headerBits
 
 var (
 	invalidAlphanumericByte = errors.New("Invalid Alphanumeric Byte")
+	alphanumericTable       = [256]int8{
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		36, -1, -1, -1, 37, 38, -1, -1, -1, -1, 39, 40, -1, 41, 42, 43,
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 44, -1, -1, -1, -1, -1,
+		-1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+		25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	}
 )
 
 func alphanumericCode(b byte) (byte, error) {
-	switch b {
-	case 0x30:
-		return 0, nil
-	case 0x31:
-		return 1, nil
-	case 0x32:
-		return 2, nil
-	case 0x33:
-		return 3, nil
-	case 0x34:
-		return 4, nil
-	case 0x35:
-		return 5, nil
-	case 0x36:
-		return 6, nil
-	case 0x37:
-		return 7, nil
-	case 0x38:
-		return 8, nil
-	case 0x39:
-		return 9, nil
-	case 0x41:
-		return 10, nil
-	case 0x42:
-		return 11, nil
-	case 0x43:
-		return 12, nil
-	case 0x44:
-		return 13, nil
-	case 0x45:
-		return 14, nil
-	case 0x46:
-		return 15, nil
-	case 0x47:
-		return 16, nil
-	case 0x48:
-		return 17, nil
-	case 0x49:
-		return 18, nil
-	case 0x4a:
-		return 19, nil
-	case 0x4b:
-		return 20, nil
-	case 0x4c:
-		return 21, nil
-	case 0x4d:
-		return 22, nil
-	case 0x4e:
-		return 23, nil
-	case 0x4f:
-		return 24, nil
-	case 0x50:
-		return 25, nil
-	case 0x51:
-		return 26, nil
-	case 0x52:
-		return 27, nil
-	case 0x53:
-		return 28, nil
-	case 0x54:
-		return 29, nil
-	case 0x55:
-		return 30, nil
-	case 0x56:
-		return 31, nil
-	case 0x57:
-		return 32, nil
-	case 0x58:
-		return 33, nil
-	case 0x59:
-		return 34, nil
-	case 0x5a:
-		return 35, nil
-	case 0x20:
-		return 36, nil
-	case 0x24:
-		return 37, nil
-	case 0x25:
-		return 38, nil
-	case 0x2a:
-		return 39, nil
-	case 0x2b:
-		return 40, nil
-	case 0x2d:
-		return 41, nil
-	case 0x2e:
-		return 42, nil
-	case 0x2f:
-		return 43, nil
-	case 0x3a:
-		return 44, nil
+	code := alphanumericTable[b]
+	if code < 0 {
+		return 0, invalidAlphanumericByte
 	}
-	return 0, invalidAlphanumericByte
+	return byte(code), nil
 }
 
 func appendContent(content []byte, mode modeIndicator, bits *BitVector) {

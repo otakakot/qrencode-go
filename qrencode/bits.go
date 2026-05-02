@@ -1,14 +1,8 @@
 package qrencode
 
 import (
-	"bytes"
-	"image"
-	"image/color"
-	"io"
+	"strings"
 )
-
-// The test benchmark shows that encoding with boolBitVector/boolBitGrid is
-// twice as fast as byteBitVector/byteBitGrid and uin32BitVector/uint32BitGrid.
 
 type BitVector struct {
 	boolBitVector
@@ -26,44 +20,9 @@ func NewBitGrid(width, height int) *BitGrid {
 	return &BitGrid{newBoolBitGrid(width, height)}
 }
 
-/*
-type BitVector struct {
-	byteBitVector
-}
-
-type BitGrid struct {
-	byteBitGrid
-}
-
-func (v *BitVector) AppendBits(b BitVector) {
-	v.byteBitVector.AppendBits(b.byteBitVector)
-}
-
-func NewBitGrid(width, height int) *BitGrid {
-	return &BitGrid{newByteBitGrid(width, height)}
-}
-*/
-
-/*
-type BitVector struct {
-	uint32BitVector
-}
-
-type BitGrid struct {
-	uint32BitGrid
-}
-
-func (v *BitVector) AppendBits(b BitVector) {
-	v.uint32BitVector.AppendBits(b.uint32BitVector)
-}
-
-func NewBitGrid(width, height int) *BitGrid {
-	return &BitGrid{newUint32BitGrid(width, height)}
-}
-*/
-
 func (v *BitVector) String() string {
-	b := bytes.Buffer{}
+	var b strings.Builder
+	b.Grow(v.Length())
 	for i, l := 0, v.Length(); i < l; i++ {
 		if v.Get(i) {
 			b.WriteString("1")
@@ -75,9 +34,11 @@ func (v *BitVector) String() string {
 }
 
 func (g *BitGrid) String() string {
-	b := bytes.Buffer{}
-	for y, w, h := 0, g.Width(), g.Height(); y < h; y++ {
-		for x := 0; x < w; x++ {
+	w, h := g.Width(), g.Height()
+	var b strings.Builder
+	b.Grow((w + 1) * h)
+	for y := range h {
+		for x := range w {
 			if g.Empty(x, y) {
 				b.WriteString(" ")
 			} else if g.Get(x, y) {
@@ -91,77 +52,81 @@ func (g *BitGrid) String() string {
 	return b.String()
 }
 
-// Encode the Grid in ANSI escape sequences and set the background according
-// to the values in the BitGrid surrounded by a white frame
-func (g *BitGrid) TerminalOutput(w io.Writer) {
-	white := "\033[47m  \033[0m"
-	black := "\033[40m  \033[0m"
-	newline := "\n"
+// ToRGB565WithSize returns RGB565 pixel data that fits within the specified width and height.
+// It automatically calculates the appropriate block size to fit the QR code.
+// The actual size may be smaller than specified to maintain square pixels.
+func (g *BitGrid) ToRGB565WithSize(maxWidth, maxHeight int) []uint16 {
+	margin := 4
 
-	w.Write([]byte(white))
-	for i := 0; i <= g.Width(); i++ {
-		w.Write([]byte(white))
-	}
-	w.Write([]byte(newline))
+	gridWithMargin := g.Width() + 2*margin
 
-	for i := 0; i < g.Height(); i++ {
-		w.Write([]byte(white))
-		for j := 0; j < g.Width(); j++ {
-			if g.Get(j, i) {
-				w.Write([]byte(black))
-			} else {
-				w.Write([]byte(white))
-			}
-		}
-		w.Write([]byte(white))
-		w.Write([]byte(newline))
-	}
-	w.Write([]byte(white))
-	for i := 0; i <= g.Width(); i++ {
-		w.Write([]byte(white))
-	}
-	w.Write([]byte(newline))
+	blockSizeWidth := maxWidth / gridWithMargin
+
+	blockSizeHeight := maxHeight / gridWithMargin
+
+	blockSize := blockSizeWidth
+
+	blockSize = min(blockSizeWidth, blockSizeHeight)
+
+	blockSize = max(blockSize, 1)
+
+	return g.ToRGB565WithMargin(blockSize, margin)
 }
 
 // Return an image of the grid, with black blocks for true items and
 // white blocks for false items, with the given block size and a
 // default margin.
-func (g *BitGrid) Image(blockSize int) image.Image {
-	return g.ImageWithMargin(blockSize, 4)
+func (g *BitGrid) ToRGB565(blockSize int) []uint16 {
+	return g.ToRGB565WithMargin(blockSize, 4)
+}
+
+// GetRGB565Size returns the actual width and height of the RGB565 image
+// that will be generated with the given block size and margin.
+func (g *BitGrid) GetRGB565Size(blockSize int, margin int) (width, height int) {
+	width = blockSize * (2*margin + g.Width())
+	height = blockSize * (2*margin + g.Height())
+	return
 }
 
 // Return an image of the grid, with black blocks for true items and
 // white blocks for false items, with the given block size and margin.
-func (g *BitGrid) ImageWithMargin(blockSize, margin int) image.Image {
-	width := blockSize * (2*margin + g.Width())
-	height := blockSize * (2*margin + g.Height())
-	i := image.NewGray16(image.Rect(0, 0, width, height))
-	for y := 0; y < blockSize*margin; y++ {
-		for x := 0; x < width; x++ {
-			i.Set(x, y, color.White)
-			i.Set(x, height-1-y, color.White)
-		}
+func (g *BitGrid) ToRGB565WithMargin(blockSize int, margin int) []uint16 {
+	gridWidth := g.Width()
+	gridHeight := g.Height()
+	width := uint16(blockSize * (2*margin + gridWidth))
+	height := uint16(blockSize * (2*margin + gridHeight))
+	size := int(width * height)
+
+	if size <= 0 || size > 1024*1024 {
+		return nil
 	}
-	for y := blockSize * margin; y < height-blockSize*margin; y++ {
-		for x := 0; x < blockSize*margin; x++ {
-			i.Set(x, y, color.White)
-			i.Set(width-1-x, y, color.White)
-		}
+
+	pixels := make([]uint16, size)
+
+	white := uint16(0xFFFF) // RGB565: 11111 111111 11111
+	black := uint16(0x0000) // RGB565: 00000 000000 00000
+
+	for i := range pixels {
+		pixels[i] = white
 	}
-	for y, w, h := 0, g.Width(), g.Height(); y < h; y++ {
-		for x := 0; x < w; x++ {
-			x0 := blockSize * (x + margin)
-			y0 := blockSize * (y + margin)
-			c := color.White
+
+	blockSizeU16 := uint16(blockSize)
+	marginU16 := uint16(margin)
+
+	for y := range gridHeight {
+		y0 := blockSizeU16 * (uint16(y) + marginU16)
+		for x := range gridWidth {
 			if g.Get(x, y) {
-				c = color.Black
-			}
-			for dy := 0; dy < blockSize; dy++ {
-				for dx := 0; dx < blockSize; dx++ {
-					i.Set(x0+dx, y0+dy, c)
+				x0 := blockSizeU16 * (uint16(x) + marginU16)
+				for dy := uint16(0); dy < blockSizeU16; dy++ {
+					rowStart := (y0 + dy) * width
+					for dx := uint16(0); dx < blockSizeU16; dx++ {
+						pixels[rowStart+x0+dx] = black
+					}
 				}
 			}
 		}
 	}
-	return i
+
+	return pixels
 }

@@ -35,34 +35,16 @@ func interleaveWithECBytes(bits *BitVector, version versionNumber, ecLevel ECLev
 
 	blocks := make([]blockPair, numRSBlocks)
 
-	for i := 0; i < numRSBlocks; i++ {
+	for i := range blocks {
 		numDataBytes, numEcBytes := getBlockSizes(numTotalBytes, numDataBytes, numRSBlocks, i)
 		blocks[i] = blockPair{make([]int, numDataBytes), make([]int, numEcBytes)}
-		for j := 0; j < numDataBytes; j++ {
+		for j := range numDataBytes {
+			bitOffset := 8 * (dataBytesOffset + j)
 			blocks[i].dataBytes[j] = 0
-			if bits.Get(8 * (dataBytesOffset + j)) {
-				blocks[i].dataBytes[j] |= 128
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 1) {
-				blocks[i].dataBytes[j] |= 64
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 2) {
-				blocks[i].dataBytes[j] |= 32
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 3) {
-				blocks[i].dataBytes[j] |= 16
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 4) {
-				blocks[i].dataBytes[j] |= 8
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 5) {
-				blocks[i].dataBytes[j] |= 4
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 6) {
-				blocks[i].dataBytes[j] |= 2
-			}
-			if bits.Get(8*(dataBytesOffset+j) + 7) {
-				blocks[i].dataBytes[j] |= 1
+			for k := range 8 {
+				if bits.Get(bitOffset + k) {
+					blocks[i].dataBytes[j] |= 1 << (7 - k)
+				}
 			}
 		}
 		generateECBytes(&blocks[i])
@@ -135,7 +117,7 @@ func generateECBytes(block *blockPair) {
 	info = info.MultiplyByMonomial(len(block.ecBytes), 1)
 	_, remainder := info.Divide(generator)
 	numZeroCoefficients := len(block.ecBytes) - len(remainder.coefficients)
-	for i := 0; i < numZeroCoefficients; i++ {
+	for i := range numZeroCoefficients {
 		block.ecBytes[i] = 0
 	}
 	copy(block.ecBytes[numZeroCoefficients:], remainder.coefficients)

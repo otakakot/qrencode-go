@@ -102,7 +102,7 @@ const (
 func bestMaskPattern(bits *BitVector, version versionNumber, ecLevel ECLevel, grid *BitGrid) int {
 	bestMaskPattern := -1
 	bestPenalty := 0
-	for maskPattern := 0; maskPattern < 8; maskPattern++ {
+	for maskPattern := range 8 {
 		buildGrid(bits, version, ecLevel, maskPattern, grid)
 		penalty := maskPenalty(grid)
 		if bestMaskPattern < 0 || penalty < bestPenalty {
@@ -181,7 +181,7 @@ func embedTypeInfo(ecLevel ECLevel, maskPattern int, grid *BitGrid) {
 	typeInfo := int(ecLevel)<<3 | maskPattern
 	bchCode := calculateBCHCode(typeInfo, typeInfoPoly)
 	typeInfo = (typeInfo<<10 | (bchCode & 0x3ff)) ^ typeInfoMaskPattern
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		bit := (typeInfo>>uint(i))&1 == 1
 		grid.Set(typeInfoCoordinates[i][0], typeInfoCoordinates[i][1], bit)
 		if i < 8 {
@@ -197,8 +197,8 @@ func maybeEmbedVersionInfo(version versionNumber, grid *BitGrid) {
 		return
 	}
 	versionInfo := int(version)<<12 | calculateBCHCode(int(version), versionInfoPoly)
-	for i := 0; i < 6; i++ {
-		for j := 0; j < 3; j++ {
+	for i := range 6 {
+		for j := range 3 {
 			bit := versionInfo&1 == 1
 			versionInfo >>= 1
 			grid.Set(i, grid.Height()-11+j, bit)
@@ -214,7 +214,7 @@ func embedDataBits(bits *BitVector, maskPattern int, grid *BitGrid) {
 			x--
 		}
 		for ; y >= 0 && y < grid.Height(); y += direction {
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				xx := x - i
 				if !grid.Empty(xx, y) {
 					continue
